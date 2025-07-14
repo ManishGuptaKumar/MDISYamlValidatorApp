@@ -1,0 +1,40 @@
+package org.pantherslabs.chimera.sentinel;
+
+import org.junit.Test;
+
+import static org.junit.Assert.*;
+
+public class ValidationServiceTest {
+
+    private final ValidationService validationService = new ValidationService("/schemaNew.json");
+
+    @Test
+    public void testValidYaml() {
+        String yaml = "name: John Doe\nage: 30";
+        String result = validationService.validateYaml(yaml);
+        assertTrue(result.contains("valid"));
+    }
+
+    @Test
+    public void testInvalidYaml_MissingRequired() {
+        String yaml = "name: John Doe";  // missing age
+        String result = validationService.validateYaml(yaml);
+        assertTrue(result.startsWith("Validation Errors"));
+        assertTrue(result.contains("required key [age] not found"));
+    }
+
+    @Test
+    public void testInvalidYaml_WrongType() {
+        String yaml = "name: John Doe\nage: thirty";
+        String result = validationService.validateYaml(yaml);
+        assertTrue(result.startsWith("Validation Errors"));
+        assertTrue(result.toLowerCase().contains("type"));
+    }
+
+    @Test
+    public void testMalformedYaml() {
+        String yaml = "name John Doe\nage: 30";  // missing colon after name
+        String result = validationService.validateYaml(yaml);
+        assertTrue(result.startsWith("Error during validation"));
+    }
+}
