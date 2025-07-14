@@ -273,10 +273,10 @@ public class GitLabUserDialog extends JDialog {
         projectCodeField.setText(prefs.get("projectCode", ""));
         tokenField.setText(prefs.get("token", ""));
     }
-
+/*
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new GitLabUserDialog(null).setVisible(true));
-    }
+    }*/
 
     public void createPullRequest(String baseFilePath,
                                               String optionalFilePath,
