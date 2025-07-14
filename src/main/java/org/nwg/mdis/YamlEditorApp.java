@@ -6,6 +6,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
 import org.fife.ui.rtextarea.RTextScrollPane;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -19,6 +20,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -29,53 +33,79 @@ public class YamlEditorApp extends JFrame {
     private final JTextArea outputArea = new JTextArea(6, 60);
     private final YamlValidationService validator = new YamlValidationService();
     private static final Logger log = MDISLogger.getLogger();
+    private JProgressBar progressBar;
 
     private final GitLabUserDialog gitService = new GitLabUserDialog(this);
     private File currentFile;
     Color customColor = Color.decode("#3C1053");
-
     public YamlEditorApp() {
         log.info("Loading MDIS - Yaml Editor Application");
-        textArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_YAML);
-        textArea.setCodeFoldingEnabled(true);
-        textArea.setFont(new Font("Consolas", Font.PLAIN, 14));
 
         setTitle("MDIS- YAML Editor + Validator");
-        setLayout(new BorderLayout());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/icons/yaml.png")));
         setIconImage(icon.getImage());
+
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        getContentPane().add(mainPanel); // this is the JFrame's content
+
         // Header banner
         JLabel banner = new JLabel(loadBanner("Natwest"));
         banner.setHorizontalAlignment(JLabel.CENTER);
-        add(banner, BorderLayout.NORTH);
+        mainPanel.add(banner, BorderLayout.NORTH);
 
-        // Editor area
+        // Editor
         textArea.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_YAML);
         textArea.setCodeFoldingEnabled(true);
         textArea.setFont(new Font("Consolas", Font.PLAIN, 14));
-
         JScrollPane editorScroll = new RTextScrollPane(textArea);
-        add(editorScroll, BorderLayout.CENTER);
+        mainPanel.add(editorScroll, BorderLayout.CENTER);
 
-        // Output pane
+        // Output area
         outputArea.setEditable(false);
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane outScroll = new JScrollPane(outputArea);
         outScroll.setBorder(BorderFactory.createTitledBorder("Validation Output"));
-        add(outScroll, BorderLayout.SOUTH);
+        mainPanel.add(outScroll, BorderLayout.SOUTH);
 
-        // Toolbar and Menu
-        add(createToolBar(), BorderLayout.WEST);
+        TextAreaLogHandler handler = new TextAreaLogHandler(outputArea);
+        handler.setLevel(Level.ALL);   // capture all levels
+        log.addHandler(handler);
+
+        log.setLevel(Level.ALL);
+/*        Logger rootLogger = Logger.getLogger("");
+        for (Handler h : rootLogger.getHandlers()) {
+            if (h instanceof ConsoleHandler) {
+                rootLogger.removeHandler(h);
+            }
+        }*/
+        // Toolbar
+        mainPanel.add(createToolBar(), BorderLayout.WEST);
+
+        // Progress Bar Panel (bottom of the frame)
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setVisible(false);
+        progressBar.setString("Processing...");
+        progressBar.setStringPainted(true);
+
+        JPanel progressPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.insets = new Insets(10, 10, 10, 10);
+        progressPanel.add(progressBar, gbc);
+
+        getContentPane().add(progressPanel, BorderLayout.PAGE_END); // add progress bar at bottom
+
         setJMenuBar(createMenuBar());
-
         pack();
-        getContentPane().setBackground(customColor);
-
         setLocationRelativeTo(null);
         setVisible(true);
         log.info("MDIS GUI - Yaml Editor Application Loaded...");
     }
+
     private ImageIcon loadIcon(String name) {
         URL url = getClass().getResource("/icons/" + name + ".png");
         if (url != null) {
@@ -173,11 +203,12 @@ public class YamlEditorApp extends JFrame {
         }
 
         if (validateYaml()) {
-        //if (true) {
             log.info("YAML Validated Successfully..Preparing Pull Request Dialog");
             PullRequestDialog prDialog = new PullRequestDialog(this, validator, textArea);
             prDialog.setVisible(true);
             if (prDialog.isConfirmed()) {
+                progressBar.setVisible(true);
+
                 String baseFilePath = prDialog.getPipelineFile().getAbsolutePath();
                 byte[] bytes = Files.readAllBytes(Paths.get(baseFilePath));
                 String fileContent = new String(bytes, StandardCharsets.UTF_8);
@@ -285,8 +316,33 @@ public class YamlEditorApp extends JFrame {
                         CreatedOn            // %s
                 );
                 log.info("Preparing to Create Pull Request");
-                gitService.createPullRequest(baseFilePath,optionalFilePath,additionalFiles,targetBranch,featureBranch,
-                        commitMessage,pullRequestTitle,htmlDescription);
+                /*gitService.createPullRequest(baseFilePath,optionalFilePath,additionalFiles,targetBranch,featureBranch,
+                        commitMessage,pullRequestTitle,htmlDescription);*/
+                String finalTargetBranch = targetBranch;
+                        SwingWorker<Void, Void> prWorker = new SwingWorker<Void, Void>() {
+
+                        @Override
+                    protected Void doInBackground() {
+                        gitService.createPullRequest(
+                                baseFilePath,
+                                optionalFilePath,
+                                additionalFiles,
+                                finalTargetBranch,
+                                featureBranch,
+                                commitMessage,
+                                pullRequestTitle,
+                                htmlDescription
+                        );
+                        return null;
+                    }
+
+                    @Override
+                    protected void done() {
+                        progressBar.setVisible(false);
+                        log.info("Pull Request process completed.");
+                    }
+                };
+                prWorker.execute();
             }
         } else {
             log.severe("YAML validation failed. Please fix errors before proceeding.");

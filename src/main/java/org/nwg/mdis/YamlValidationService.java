@@ -10,16 +10,24 @@ import com.networknt.schema.ValidationMessage;
 
 import java.io.InputStream;
 import java.util.Set;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class YamlValidationService {
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
     private final JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
+    private static final Logger log = MDISLogger.getLogger();
 
     public String validate(String yamlText) {
-        String schemaPath = "/" + FileService.getTagValue(yamlText, "template_id") + ".json";
+        String templateName = FileService.getTagValue(yamlText, "template_id");
+        String schemaPath = "/" + templateName + ".json";
+        log.info("Validating YAML Content With Schema "+ templateName + ".json");
         try (InputStream schemaStream = getClass().getResourceAsStream(schemaPath)) {
-            if (schemaStream == null) return "Schema file not found in Resource Folder: " + schemaPath;
+            if (schemaStream == null)
+            {
+                log.severe("Schema file not found in Resource Folder: " + schemaPath);
+                return "Schema file not found in Resource Folder: " + schemaPath;
+            }
             JsonNode schemaNode = yamlMapper.readTree(schemaStream);
             JsonSchema schema = schemaFactory.getSchema(schemaNode);
             JsonNode data = yamlMapper.readTree(yamlText);

@@ -41,7 +41,7 @@ public class MDISLogger {
     }
 
     // Custom formatter for single-line output
-    private static class SingleLineFormatter extends Formatter {
+    public static class SingleLineFormatter extends Formatter {
         private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
         @Override

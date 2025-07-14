@@ -7,8 +7,11 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.*;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class FileService {
+    private static final Logger log = MDISLogger.getLogger();
+
     public static File promptOpen(Component parent) {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("MDIS - Open YAML");
@@ -53,14 +56,19 @@ public class FileService {
 
         return null;
     }
-    public static String getTagValue(String FileContent,String tagName)
-    {
-        Yaml yaml = new Yaml();
-        Map<String, Object> data = yaml.load(FileContent);
-        Object value = data.get(tagName);
-        return value != null ? value.toString() : "Unknown";
-    }
 
+    public static String getTagValue(String fileContent, String tagName) {
+        try {
+            Yaml yaml = new Yaml();
+            Map<String, Object> data = yaml.load(fileContent);
+            Object value = data.get(tagName);
+            return value != null ? value.toString() : "Unknown";
+        } catch (Exception e) {
+            // Log the error or handle it as needed
+            log.severe("Error reading YAML tag: ("+ tagName +") Error : " + e.getMessage());
+            return "Unknown";
+        }
+    }
     public static String readFile(File f) throws IOException {
         return new String(java.nio.file.Files.readAllBytes(f.toPath()));
     }

@@ -23,7 +23,6 @@ public class PullRequestDialog extends JDialog {
     private JButton createPrBtn, cancelBtn;
     private final Color customColor = Color.decode("#5A287D");
     private boolean confirmed = false;
-//#3C1053
     private final YamlValidationService validator;
     private final RSyntaxTextArea editorTextArea;
     private final YamlEditorApp parent;
@@ -39,7 +38,6 @@ public class PullRequestDialog extends JDialog {
         pack();
         setLocationRelativeTo(parent);
         prefillPipelinePath();
-        //setVisible(true);
     }
 
     private void prefillPipelinePath() {
@@ -275,17 +273,6 @@ public class PullRequestDialog extends JDialog {
         }
         return list;
     }
-/*    private void applyTheme(Component comp) {
-        comp.setBackground(customColor);
-        if (comp instanceof JLabel) {
-            ((JLabel) comp).setForeground(Color.WHITE);
-        }
-        if (comp instanceof JPanel) {
-            for (Component child : ((JPanel) comp).getComponents()) {
-                applyTheme(child);
-            }
-        }
-    }*/
     // Simple listener utility
     private interface SimpleDocumentListener extends javax.swing.event.DocumentListener {
         void update();

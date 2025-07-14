@@ -18,6 +18,8 @@ import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
 public class GitLabUserDialog extends JDialog {
+    private JProgressBar progressBar;
+    private final Color customColor = Color.decode("#5A287D");
     private GitLabApi gitLabApi;
     private User currentUser;
     private JTextField projectCodeField, tokenField;
@@ -31,8 +33,11 @@ public class GitLabUserDialog extends JDialog {
     private ImageIcon crossIcon;
     private static final Logger log = MDISLogger.getLogger();
 
+
     public GitLabUserDialog(Frame parent) {
         super(parent, "GitLab User Profile", true);
+        setBackground(customColor);
+
         log.info("Loading GitLab User Profile");
         setSize(500, 200);
         log.info("Loading GitLab User Profile Dialog Size");
@@ -42,7 +47,7 @@ public class GitLabUserDialog extends JDialog {
         log.info("Loading GitLab User Profile initialize Components");
         loadSettings();
         log.info("Loading GitLab User Profile Settings");
-
+        //setBackground(customColor);
     }
 
     private ImageIcon loadScaledIcon(String path) {
@@ -60,34 +65,48 @@ public class GitLabUserDialog extends JDialog {
 
     private void initComponents() {
         setLayout(new GridBagLayout());
+        getContentPane().setBackground(customColor);
         GridBagConstraints gbc = new GridBagConstraints();
         tickIcon = loadScaledIcon("/icons/greenOK.png");
         crossIcon = loadScaledIcon("/icons/CrossRed.png");
-
             // Top message label
         messageLabel = new JLabel("Please Enter Project Code and Private Token");
-        messageLabel.setForeground(Color.BLUE);
+        messageLabel.setForeground(Color.WHITE);
         messageLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        messageLabel.setBackground(customColor);
+        messageLabel.setOpaque(false);
 
         JLabel lblProjectCode = new JLabel("Project Code:");
+        lblProjectCode.setForeground(Color.WHITE);
         projectCodeField = new JTextField(25);
         statusProjectCode = new JLabel(); // For tick/cross
+      //  lblProjectCode.setBackground(Color.WHITE);
 
         JLabel lblToken = new JLabel("Access Token:");
+        lblToken.setForeground(Color.WHITE);
         tokenField = new JTextField(25);
         statusToken = new JLabel();
 
         JLabel lblUserName = new JLabel("User Name:");
+        lblUserName.setForeground(Color.WHITE);
         userNameField = new JTextField(25);
         userNameField.setEditable(false);
 
         JLabel lblRacf = new JLabel("User Id:");
+        lblRacf.setForeground(Color.WHITE);
         racfField = new JTextField(25);
         racfField.setEditable(false);
 
         JLabel lblEmail = new JLabel("Email Address:");
+        lblEmail.setForeground(Color.WHITE);
         emailField = new JTextField(25);
         emailField.setEditable(false);
+
+        progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true); // Shows a spinning bar
+        progressBar.setVisible(false);      // Hidden by default
+        progressBar.setBackground(customColor);
+        progressBar.setForeground(Color.WHITE);
 
         JButton testConnection = new JButton("Test");
         saveButton = new JButton("Save");
@@ -110,20 +129,17 @@ public class GitLabUserDialog extends JDialog {
         });
         saveButton.addActionListener(e -> saveSettings());
         loadButton.addActionListener(e -> {
-            try {
-                log.info("Getting User Information's from Gitlab Connection..");
-                fetchGitLabUserInfo();
-                log.info("Gitlab User Information Read Successful..");
+            log.info("Getting User Information's from Gitlab Connection..");
+            fetchGitLabUserInfo();
+            log.info("Gitlab User Information Read Successful..");
 
-            } catch (GitLabApiException ex) {
-                log.severe("Unable to get User Information "  + ex.getMessage());
-            }
         });
         closeButton.addActionListener(e -> dispose());
 
         gbc.insets = new Insets(2, 10, 2, 10);
         gbc.anchor = GridBagConstraints.WEST;
         int y = 0;
+
 
         // Row 0: Message label
         gbc.gridx = 0; gbc.gridy = y; gbc.gridwidth = 3;
@@ -158,21 +174,69 @@ public class GitLabUserDialog extends JDialog {
         gbc.gridx = 1; gbc.gridy = y++; gbc.gridwidth = 2; add(emailField, gbc);
         gbc.gridwidth = 1;
 
+        gbc.gridx = 0;
+        gbc.gridy = y++;
+        gbc.gridwidth = 3;
+        gbc.anchor = GridBagConstraints.CENTER;
+        add(progressBar, gbc);
+
         // Row 6: Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.add(testConnection);
         buttonPanel.add(saveButton);
         buttonPanel.add(loadButton);
-
         gbc.gridx = 0; gbc.gridy = y; gbc.gridwidth = 3;
         gbc.anchor = GridBagConstraints.EAST;
+        buttonPanel.setBackground(customColor);
         add(buttonPanel, gbc);
     }
     private void verifyConnection() throws GitLabApiException {
         fetchGitLabUserInfo();
     }
 
-    private void fetchGitLabUserInfo() throws GitLabApiException {
+
+    private void fetchGitLabUserInfo() {
+        String projectCode = projectCodeField.getText().trim();
+        String token = tokenField.getText().trim();
+
+        progressBar.setVisible(true); // Show progress bar
+        saveButton.setEnabled(false); // Disable save during loading
+        SwingWorker<User, Void> worker = new SwingWorker<User, Void>() {
+
+            @Override
+            protected User doInBackground() throws Exception {
+                gitLabApi = new GitLabApi(GitlabUrl, token);
+                return gitLabApi.getUserApi().getCurrentUser();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    currentUser = (User) get();
+                    projectCodeField.setText(projectCode);
+                    userNameField.setText(currentUser.getName());
+                    racfField.setText(currentUser.getUsername());
+                    emailField.setText(currentUser.getEmail());
+                    saveButton.setEnabled(true);
+                    showStatus(true, "Connection Successful");
+                    log.info("Gitlab User Information Read Successful..");
+                    if (projectCode.isEmpty() || token.isEmpty()) {
+                        log.severe("Please provide both Project Code and Access Token to get User Info");
+                        JOptionPane.showMessageDialog(null, "Please provide both Project Code and Access Token.");
+                    }
+                } catch (Exception ex) {
+                    log.severe("Unable to get User Information: " + ex.getMessage());
+                    showStatus(false, "Connection failed: " + ex.getMessage());
+                } finally {
+                    progressBar.setVisible(false); // Hide when done
+                }
+            }
+        };
+
+        worker.execute(); // Start background task
+    }
+
+  /*  private void fetchGitLabUserInfo() throws GitLabApiException {
         String projectCode = projectCodeField.getText().trim();
         String token = tokenField.getText().trim();
         this.gitLabApi = new GitLabApi(GitlabUrl, token);
@@ -186,7 +250,7 @@ public class GitLabUserDialog extends JDialog {
             log.severe("Please provide both Project Code and Access Token to get User Info");
             JOptionPane.showMessageDialog(this, "Please provide both Project Code and Access Token.");
         }
-    }
+    }*/
 
     private void saveSettings() {
         Preferences prefs = Preferences.userNodeForPackage(GitLabUserDialog.class);
@@ -343,6 +407,8 @@ public class GitLabUserDialog extends JDialog {
         }
         return newAction;
     }
+
+
     public void MyProfile() {
         log.info("Loading Your Profile...");
         SwingUtilities.invokeLater(() -> new GitLabUserDialog(null).setVisible(true));
