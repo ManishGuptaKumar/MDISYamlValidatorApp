@@ -1,5 +1,6 @@
 package org.nwg.mdis;
 
+import com.formdev.flatlaf.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -20,15 +21,14 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import static org.nwg.mdis.FileService.getTagValue;
+import static org.nwg.mdis.FileService.*;
 
 public class YamlEditorApp extends JFrame {
+
     private final RSyntaxTextArea textArea = new RSyntaxTextArea(20, 60);
     private final JTextArea outputArea = new JTextArea(6, 60);
     private final YamlValidationService validator = new YamlValidationService();
@@ -36,11 +36,14 @@ public class YamlEditorApp extends JFrame {
     private JProgressBar progressBar;
 
     private final GitLabUserDialog gitService = new GitLabUserDialog(this);
+
+
     private File currentFile;
     Color customColor = Color.decode("#3C1053");
     public YamlEditorApp() {
+        setResizable(false);
+        setDefaultLookAndFeelDecorated(true);
         log.info("Loading MDIS - Yaml Editor Application");
-
         setTitle("MDIS- YAML Editor + Validator");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/icons/yaml.png")));
@@ -65,7 +68,7 @@ public class YamlEditorApp extends JFrame {
         outputArea.setEditable(false);
         outputArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane outScroll = new JScrollPane(outputArea);
-        outScroll.setBorder(BorderFactory.createTitledBorder("Validation Output"));
+        outScroll.setBorder(BorderFactory.createTitledBorder("Log"));
         mainPanel.add(outScroll, BorderLayout.SOUTH);
 
         TextAreaLogHandler handler = new TextAreaLogHandler(outputArea);
@@ -128,31 +131,60 @@ public class YamlEditorApp extends JFrame {
         tb.setBackground(Color.WHITE);
 
         JButton openBtn = new JButton(loadIcon("open"));
-        openBtn.setToolTipText("Open YAML file");
         openBtn.addActionListener(e -> openFile());
+        openBtn.setToolTipText(makeTooltip(
+                "/icons/open.png",
+                "Open",
+                "Browse and select a YAML file from your computer to load it into the editor."
+        ));
 
         JButton saveBtn = new JButton(loadIcon("save"));
         saveBtn.setToolTipText("Save current file");
         saveBtn.addActionListener(e -> saveFile());
+        saveBtn.setToolTipText(makeTooltip(
+                "/icons/save.png",
+                "Save YAML",
+                "Save the current YAML content to the previously opened file. Make sure the file path is valid."
+        ));
 
         JButton saveAsBtn = new JButton(loadIcon("saveas"));
-        saveAsBtn.setToolTipText("Save As");
         saveAsBtn.addActionListener(e -> saveAsFile());
+        saveAsBtn.setToolTipText(makeTooltip(
+                "/icons/saveas.png",
+                "Save As YAML",
+                "Save the current YAML content under a new file name or location of your choice."
+        ));
 
         JButton beautifyBtn = new JButton(loadIcon("beautify"));
-        beautifyBtn.setToolTipText("Beautify YAML");
         beautifyBtn.addActionListener(e -> beautifyYaml());
+        beautifyBtn.setToolTipText(makeTooltip(
+                "/icons/beautify.png",
+                "Beautify YAML",
+                "Format the YAML with proper indentation and structure for better readability."
+        ));
 
         JButton validateBtn = new JButton(loadIcon("validate"));
-        validateBtn.setToolTipText("Validate YAML");
         validateBtn.addActionListener(e -> validateYaml());
+        validateBtn.setToolTipText(makeTooltip(
+                "/icons/validate.png",
+                "Validate YAML",
+                "Check the YAML syntax and validate it against the required schema to ensure correctness."
+        ));
 
         JButton clearBtn = new JButton(loadIcon("clear"));
-        clearBtn.setToolTipText("Clear editor");
         clearBtn.addActionListener(e -> textArea.setText(""));
+        clearBtn.setToolTipText(makeTooltip(
+                "/icons/clear.png",
+                "Clear Editor",
+                "Remove all text from the YAML editor. Use with caution as this action cannot be undone."
+        ));
 
         JButton fontBtn = new JButton(loadIcon("font"));
-        fontBtn.setToolTipText("Change font");
+        fontBtn.setToolTipText(makeTooltip(
+                "/icons/font.png",
+                "Font Settings",
+                "Customize the font family, size, or style used in the YAML editor to improve readability."
+        ));
         fontBtn.addActionListener(e -> {
             FontChooserDialog dlg = new FontChooserDialog(this, textArea.getFont());
             Font f = dlg.getSelectedFont();
@@ -160,7 +192,11 @@ public class YamlEditorApp extends JFrame {
         });
 
         JButton createPR = new JButton(loadIcon("PullReq"));
-        createPR.setToolTipText("Create Pull Request");
+        createPR.setToolTipText(makeTooltip(
+                "/icons/PullReq.png",
+                "Create Pull Request",
+                "Open a new window to configure the target branch, add SQL files, and submit your GitLab pull request."
+        ));
         createPR.addActionListener(e -> {
             try {
                 validateAndOpenPullRequestDialog();
@@ -170,8 +206,19 @@ public class YamlEditorApp extends JFrame {
         });
 
         JButton userProfile = new JButton(loadIcon("User"));
-        userProfile.setToolTipText("Manage Your Profile");
-        userProfile.addActionListener(e -> gitService.MyProfile());
+        userProfile.setToolTipText(makeTooltip(
+                "/icons/User.png",
+                "My GitLab Profile",
+                "Open your GitLab user profile window to configure project code, access token, and view user details."
+        ));
+        userProfile.addActionListener(e -> {
+            GitLabUserDialog dialog = new GitLabUserDialog(this);
+            dialog.setAlwaysOnTop(true);
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);
+            dialog.toFront();
+            dialog.requestFocusInWindow();
+        });
         tb.setOpaque(true);
         tb.add(openBtn);
         tb.add(saveBtn);
@@ -316,8 +363,6 @@ public class YamlEditorApp extends JFrame {
                         CreatedOn            // %s
                 );
                 log.info("Preparing to Create Pull Request");
-                /*gitService.createPullRequest(baseFilePath,optionalFilePath,additionalFiles,targetBranch,featureBranch,
-                        commitMessage,pullRequestTitle,htmlDescription);*/
                 String finalTargetBranch = targetBranch;
                         SwingWorker<Void, Void> prWorker = new SwingWorker<Void, Void>() {
 
@@ -379,7 +424,14 @@ public class YamlEditorApp extends JFrame {
 
         JMenu git = new JMenu("GitLab");
         JMenuItem UserProfile = new JMenuItem("My Gitlab Profile",loadIcon("User") );
-        UserProfile.addActionListener(e -> gitService.MyProfile());
+        UserProfile.addActionListener(e -> {
+            GitLabUserDialog dialog = new GitLabUserDialog(this);
+            dialog.setAlwaysOnTop(true);
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);
+            dialog.toFront();
+            dialog.requestFocusInWindow();
+        });
         git.add(UserProfile);
 
         JMenuItem PullRequest = new JMenuItem("Create Pull Request",loadIcon("gitlab") );
@@ -394,9 +446,14 @@ public class YamlEditorApp extends JFrame {
         git.add(PullRequest);
 
         JMenu help = new JMenu("Help");
-        help.add(menuItem("About",loadIcon("clear"), e ->
+        help.add(menuItem(
+                "Help Topic on Confluence",
+                loadIcon("yaml"),
+                e -> openWebpage("https://gitlab.com/your/repo")
+        ));
+        help.add(menuItem("About",loadIcon("yaml"), e ->
                 JOptionPane.showMessageDialog(this,
-                        "YAML Editor + Validator\nVersion 1.0",
+                        "MDIS - YAML Editor + Validator\nVersion 1.0\nDeveloped By : Manish Kumar\nEmail : Manish.Kumar@Natwest.com",
                         "About", JOptionPane.INFORMATION_MESSAGE)));
 
         mb.add(file);
@@ -446,9 +503,15 @@ public class YamlEditorApp extends JFrame {
     }
 
     private void beautifyYaml() {
+        String yamlText = textArea.getText().trim();
+
+        if (yamlText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "YAML content is empty. Please paste valid YAML before beautifying.", "Input Required", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         try {
             ObjectMapper m = new ObjectMapper(new YAMLFactory());
-            JsonNode node = m.readTree(textArea.getText());
+            JsonNode node = m.readTree(yamlText);
             String pretty = m.writerWithDefaultPrettyPrinter().writeValueAsString(node);
             textArea.setText(pretty);
         } catch (Exception ex) {
@@ -457,17 +520,27 @@ public class YamlEditorApp extends JFrame {
     }
 
     private boolean validateYaml() {
+        String yamlText = textArea.getText().trim();
+        if (yamlText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "YAML content is empty. Please paste valid YAML before validating.", "Input Required", JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
         String validationResult = validator.validate(textArea.getText());
         assert validationResult != null;
         boolean response = validationResult.replace(" ", "").equalsIgnoreCase("YAMLisvalid!");
         outputArea.setText(validationResult);
+        if(!response) JOptionPane.showMessageDialog(this, "Yaml Validation Failed: \n"
+                + validationResult, "Error", JOptionPane.ERROR_MESSAGE);
         return response;
     }
 
     public File getCurrentFile() { return currentFile; }
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws UnsupportedLookAndFeelException {
+        //UIManager.setLookAndFeel(new FlatLightLaf());
+        //UIManager.setLookAndFeel(new FlatDarkLaf());
+        UIManager.setLookAndFeel(new FlatIntelliJLaf());
         SwingUtilities.invokeLater(YamlEditorApp::new);
     }
 }

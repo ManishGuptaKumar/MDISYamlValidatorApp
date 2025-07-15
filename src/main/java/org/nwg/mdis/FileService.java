@@ -6,6 +6,7 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.*;
+import java.net.URI;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -76,6 +77,22 @@ public class FileService {
     public static void writeFile(File f, String content) throws IOException {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
             bw.write(content);
+        }
+    }
+
+    static String makeTooltip(String iconPath, String title, String description) {
+        return "<html><body style='width:250px;'>"
+                + "<img src='" + FileService.class.getResource(iconPath) + "' width='24' height='24'><br>"
+                + "<b>" + title + "</b><br>"
+                + description
+                + "</body></html>";
+    }
+
+    static void openWebpage(String url) {
+        try {
+            Desktop.getDesktop().browse(new URI(url));
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(null, "Failed to open link: " + ex.getMessage());
         }
     }
 }

@@ -17,6 +17,8 @@ import java.util.logging.Logger;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
+import static org.nwg.mdis.FileService.makeTooltip;
+
 public class GitLabUserDialog extends JDialog {
     private JProgressBar progressBar;
     private final Color customColor = Color.decode("#5A287D");
@@ -37,18 +39,23 @@ public class GitLabUserDialog extends JDialog {
     public GitLabUserDialog(Frame parent) {
         super(parent, "GitLab User Profile", true);
         setBackground(customColor);
-
         log.info("Loading GitLab User Profile");
-        setSize(500, 200);
-        log.info("Loading GitLab User Profile Dialog Size");
-        setLocationRelativeTo(parent);
-        log.info("Loading GitLab User Profile Setting Screen Position");
-        initComponents();
+
+        setMinimumSize(new Dimension(600, 300));
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        initComponents();  // 🔁 FIRST load UI
         log.info("Loading GitLab User Profile initialize Components");
+
         loadSettings();
         log.info("Loading GitLab User Profile Settings");
-        //setBackground(customColor);
+
+        pack();                    // 🔁 THEN pack after components added
+        setLocationRelativeTo(parent); // 🔁 Then center
+        setAlwaysOnTop(true);      // 🔁 Then set always on top
+        log.info("GitLab User Profile Dialog prepared");
     }
+
 
     private ImageIcon loadScaledIcon(String path) {
         ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource(path)));
@@ -69,38 +76,101 @@ public class GitLabUserDialog extends JDialog {
         GridBagConstraints gbc = new GridBagConstraints();
         tickIcon = loadScaledIcon("/icons/greenOK.png");
         crossIcon = loadScaledIcon("/icons/CrossRed.png");
-            // Top message label
-        messageLabel = new JLabel("Please Enter Project Code and Private Token");
+
+        JPanel messagePanel = new JPanel();
+        messagePanel.setLayout(new BorderLayout(10, 0)); // gap between icon and text
+        messagePanel.setBackground(customColor); // your custom background
+
+// 1. Icon label (left)
+        //ImageIcon infoIcon = new ImageIcon(getClass().getResource());
+        ImageIcon icon = new ImageIcon(Objects.requireNonNull(getClass().getResource("/icons/gitlab-logo-500.png")));
+        Image scaledImage = icon.getImage().getScaledInstance(70, 70, Image.SCALE_SMOOTH);
+        ImageIcon scaledIcon = new ImageIcon(scaledImage);
+        JLabel iconLabel = new JLabel(scaledIcon);
+        iconLabel.setVerticalAlignment(SwingConstants.TOP); // align top if text is multiline
+
+// 2. Multiline message label (right)
+        String message = "Please enter your Project Code and Private Token. "
+                + "Ensure the token has read access to the GitLab repository.";
+
+// Wrap message using HTML
+        messageLabel = new JLabel("<html><body style='width:300px;'>" + message + "</body></html>");
         messageLabel.setForeground(Color.WHITE);
         messageLabel.setFont(new Font("Arial", Font.BOLD, 12));
-        messageLabel.setBackground(customColor);
         messageLabel.setOpaque(false);
+
+// Add to messagePanel
+        messagePanel.add(iconLabel, BorderLayout.WEST);
+        messagePanel.add(messageLabel, BorderLayout.CENTER);
+
+
 
         JLabel lblProjectCode = new JLabel("Project Code:");
         lblProjectCode.setForeground(Color.WHITE);
         projectCodeField = new JTextField(25);
         statusProjectCode = new JLabel(); // For tick/cross
-      //  lblProjectCode.setBackground(Color.WHITE);
-
+        projectCodeField.setToolTipText(makeTooltip(
+                "/icons/gitlab.png",
+                "GitLab Project ID",
+                "<html><body width='300'>" +
+                        "<b>Enter the numeric ID of your GitLab project.</b><br><br>" +
+                        "To find it:<br>" +
+                        "• Open your GitLab project in the browser.<br>" +
+                        "• The Project ID is visible near the project title or under <b>Settings > General</b>.<br>" +
+                        "</body></html>"
+        ));
         JLabel lblToken = new JLabel("Access Token:");
         lblToken.setForeground(Color.WHITE);
-        tokenField = new JTextField(25);
+        tokenField = new JPasswordField(25);
+        tokenField.setToolTipText(makeTooltip(
+                "/tooltips/token.png",
+                "GitLab Access Token",
+                "<html><body width='300'>" +
+                        "<b>Enter your GitLab Personal Access Token.</b><br><br>" +
+                        "To generate one:<br>" +
+                        "• Go to <b>User Settings > Access Tokens</b> in GitLab.<br>" +
+                        "• Name it (e.g., 'Pipeline PR Token').<br>" +
+                        "• Select the following scopes:<br>" +
+                        "&nbsp;&nbsp;✅ <b>api</b><br>" +
+                        "&nbsp;&nbsp;✅ <b>read_repository</b><br>" +
+                        "&nbsp;&nbsp;✅ <b>write_repository</b><br><br>" +
+                        "Copy the token shown and paste it here. Keep it secure." +
+                        "</body></html>"
+        ));
         statusToken = new JLabel();
 
         JLabel lblUserName = new JLabel("User Name:");
         lblUserName.setForeground(Color.WHITE);
         userNameField = new JTextField(25);
         userNameField.setEditable(false);
+        userNameField.setToolTipText(makeTooltip(
+                "/tooltips/user-name.png",
+                "GitLab User Name",
+                "This is your full name as registered in your GitLab profile.\n" +
+                        "It will be auto-filled after a successful connection test."
+        ));
 
         JLabel lblRacf = new JLabel("User Id:");
         lblRacf.setForeground(Color.WHITE);
         racfField = new JTextField(25);
         racfField.setEditable(false);
+        racfField.setToolTipText(makeTooltip(
+                "/tooltips/id-card.png",
+                "GitLab User ID",
+                "This is your GitLab user ID.\n" +
+                        "It will be auto-populated after testing your GitLab connection."
+        ));
 
         JLabel lblEmail = new JLabel("Email Address:");
         lblEmail.setForeground(Color.WHITE);
         emailField = new JTextField(25);
         emailField.setEditable(false);
+        emailField.setToolTipText(makeTooltip(
+                "/tooltips/email.png",
+                "GitLab Email Address",
+                "This is the email address associated with your GitLab account.\n" +
+                        "It will be fetched after verifying your access token."
+        ));
 
         progressBar = new JProgressBar();
         progressBar.setIndeterminate(true); // Shows a spinning bar
@@ -109,9 +179,26 @@ public class GitLabUserDialog extends JDialog {
         progressBar.setForeground(Color.WHITE);
 
         JButton testConnection = new JButton("Test");
+        testConnection.setToolTipText(makeTooltip(
+                "/tooltips/testConnection.png",
+                "Test GitLab Connection",
+                "<html><body width='300'>" +
+                        "Click to verify the GitLab connection using the <b>Project ID</b> and <b>Access Token</b> provided.<br><br>" +
+                        "If successful, your user profile (name, ID, email) will be auto-filled from GitLab." +
+                        "</body></html>"
+        ));
         saveButton = new JButton("Save");
+        saveButton.setToolTipText(makeTooltip(
+                "/tooltips/save-user.png",
+                "Save GitLab Configuration",
+                "<html><body width='300'>" +
+                        "Click to save the <b>Project ID</b> and <b>Access Token</b> securely using Preferences.<br><br>" +
+                        "These settings will be auto-loaded next time you launch the app.<br>" +
+                        "<b>Note:</b> Saved locally, not encrypted." +
+                        "</body></html>"
+        ));
         saveButton.setEnabled(false);
-        JButton loadButton = new JButton("Load");
+        //JButton loadButton = new JButton("Load");
         JButton closeButton = new JButton("Close");
 
         // Action Listeners
@@ -128,12 +215,12 @@ public class GitLabUserDialog extends JDialog {
             }
         });
         saveButton.addActionListener(e -> saveSettings());
-        loadButton.addActionListener(e -> {
+   /*     loadButton.addActionListener(e -> {
             log.info("Getting User Information's from Gitlab Connection..");
             fetchGitLabUserInfo();
             log.info("Gitlab User Information Read Successful..");
 
-        });
+        });*/
         closeButton.addActionListener(e -> dispose());
 
         gbc.insets = new Insets(2, 10, 2, 10);
@@ -144,7 +231,7 @@ public class GitLabUserDialog extends JDialog {
         // Row 0: Message label
         gbc.gridx = 0; gbc.gridy = y; gbc.gridwidth = 3;
         gbc.anchor = GridBagConstraints.CENTER;
-        add(messageLabel, gbc);
+        add(messagePanel, gbc);
         gbc.gridwidth = 1;
         gbc.anchor = GridBagConstraints.WEST;
         y++;
@@ -184,7 +271,7 @@ public class GitLabUserDialog extends JDialog {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         buttonPanel.add(testConnection);
         buttonPanel.add(saveButton);
-        buttonPanel.add(loadButton);
+        buttonPanel.add(closeButton);
         gbc.gridx = 0; gbc.gridy = y; gbc.gridwidth = 3;
         gbc.anchor = GridBagConstraints.EAST;
         buttonPanel.setBackground(customColor);
@@ -236,22 +323,6 @@ public class GitLabUserDialog extends JDialog {
         worker.execute(); // Start background task
     }
 
-  /*  private void fetchGitLabUserInfo() throws GitLabApiException {
-        String projectCode = projectCodeField.getText().trim();
-        String token = tokenField.getText().trim();
-        this.gitLabApi = new GitLabApi(GitlabUrl, token);
-        this.currentUser = gitLabApi.getUserApi().getCurrentUser();
-        projectCodeField.setText(projectCode);
-        userNameField.setText(currentUser.getName());
-        racfField.setText(currentUser.getUsername());
-        emailField.setText(currentUser.getEmail());
-        saveButton.setEnabled(true);
-        if (projectCode.isEmpty() || token.isEmpty()) {
-            log.severe("Please provide both Project Code and Access Token to get User Info");
-            JOptionPane.showMessageDialog(this, "Please provide both Project Code and Access Token.");
-        }
-    }*/
-
     private void saveSettings() {
         Preferences prefs = Preferences.userNodeForPackage(GitLabUserDialog.class);
         try {
@@ -273,10 +344,6 @@ public class GitLabUserDialog extends JDialog {
         projectCodeField.setText(prefs.get("projectCode", ""));
         tokenField.setText(prefs.get("token", ""));
     }
-/*
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new GitLabUserDialog(null).setVisible(true));
-    }*/
 
     public void createPullRequest(String baseFilePath,
                                               String optionalFilePath,
@@ -299,7 +366,7 @@ public class GitLabUserDialog extends JDialog {
             Branch featureBranchNm = gitLabApi.getRepositoryApi().createBranch(project.getId(), featureBranch, targetBranch);
             log.info("Feature Branch Created Successfully");
             List<CommitAction> commitActions = new ArrayList<>();
-            log.info("Commiting Files to Pull Requests...");
+            log.info("Commiting Files to Merge Requests...");
             Path path = Paths.get(baseFilePath);
             byte[] bytes = Files.readAllBytes(path);
             String content = new String(bytes, StandardCharsets.UTF_8);
@@ -319,7 +386,7 @@ public class GitLabUserDialog extends JDialog {
                 String optPrefix = "src/metadata/manifest"+ "/" + optPath.getFileName();
                 CommitAction.Action optAction= checkIfFileExists(gitLabApi,project.getId(),optPrefix,featureBranchNm.getName());
 
-                byte[] optBytes = Files.readAllBytes(path);
+                byte[] optBytes = Files.readAllBytes(optPath);
                 String optContent = new String(optBytes, StandardCharsets.UTF_8);
 
                 commitActions.add(new CommitAction()
@@ -363,7 +430,7 @@ public class GitLabUserDialog extends JDialog {
             this.gitLabApi = new GitLabApi(GitlabUrl, projectToken);
             this.currentUser = gitLabApi.getUserApi().getCurrentUser();
             Long userId = currentUser.getId();
-            log.info(currentUser.getName() + " Creating Pull Request");
+            log.info("Creating Merge Request......");
             MergeRequestParams mergeParams = new MergeRequestParams()
                     .withSourceBranch(featureBranch)
                     .withTargetBranch(targetBranch)
@@ -373,10 +440,11 @@ public class GitLabUserDialog extends JDialog {
                     .withRemoveSourceBranch(true);
 
             MergeRequest MR= gitLabApi.getMergeRequestApi().createMergeRequest(project.getId(), mergeParams);
-            log.info(currentUser.getName() + " Pull Request " + MR.getWebUrl()+ " Created");
+            String Message = String.format("%s Created Merge Request %s and URL %s",
+                    currentUser.getName(),MR.getIid(),MR.getWebUrl());
+            log.info(Message);
 
-            JOptionPane.showMessageDialog(null, "Merge request created successfully! " + MR.getWebUrl(), "Success", JOptionPane.INFORMATION_MESSAGE);
-
+            JOptionPane.showMessageDialog(null, Message, MR.getId() + " Created", JOptionPane.INFORMATION_MESSAGE);
         }
         catch (GitLabApiException e) {
             log.severe("Gitlab Exception Occurred " + e.getMessage());
@@ -390,8 +458,7 @@ public class GitLabUserDialog extends JDialog {
         }
     }
 
-    public CommitAction.Action checkIfFileExists(GitLabApi api, Long projectId,String filePath, String branch)
-    {
+    public CommitAction.Action checkIfFileExists(GitLabApi api, Long projectId,String filePath, String branch) throws GitLabApiException {
         CommitAction.Action newAction = CommitAction.Action.CREATE;
         try {
             log.info("Checking File Existence For "+ filePath);
@@ -399,19 +466,13 @@ public class GitLabUserDialog extends JDialog {
             newAction = CommitAction.Action.UPDATE;
             log.info("File Exists, Updating");
         } catch (GitLabApiException e) {
-            if (e.getHttpStatus() != 404)
-            {
-                log.info("File Does not Exists, Creating");
-                newAction = CommitAction.Action.CREATE;
+            if (e.getHttpStatus() == 404) {
+                log.info("File does not exist, will CREATE.");
+            } else {
+                log.severe("Unexpected GitLab error when checking file: " + e.getMessage());
+                throw e;
             }
         }
         return newAction;
-    }
-
-
-    public void MyProfile() {
-        log.info("Loading Your Profile...");
-        SwingUtilities.invokeLater(() -> new GitLabUserDialog(null).setVisible(true));
-        log.info("Profile Loaded...");
     }
 }
