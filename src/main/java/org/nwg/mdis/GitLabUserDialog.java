@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
@@ -215,12 +216,7 @@ public class GitLabUserDialog extends JDialog {
             }
         });
         saveButton.addActionListener(e -> saveSettings());
-   /*     loadButton.addActionListener(e -> {
-            log.info("Getting User Information's from Gitlab Connection..");
-            fetchGitLabUserInfo();
-            log.info("Gitlab User Information Read Successful..");
 
-        });*/
         closeButton.addActionListener(e -> dispose());
 
         gbc.insets = new Insets(2, 10, 2, 10);
@@ -295,7 +291,68 @@ public class GitLabUserDialog extends JDialog {
                 gitLabApi = new GitLabApi(GitlabUrl, token);
                 return gitLabApi.getUserApi().getCurrentUser();
             }
+            @Override
+            protected void done() {
+                try {
+                    currentUser = get();
+                    projectCodeField.setText(projectCode);
+                    userNameField.setText(currentUser.getName());
+                    racfField.setText(currentUser.getUsername());
+                    emailField.setText(currentUser.getEmail());
+                    saveButton.setEnabled(true);
+                    showStatus(true, "Connection Successful");
+                    log.info("GitLab User Information retrieved successfully.");
 
+                    if (projectCode.isEmpty() || token.isEmpty()) {
+                        log.warning("Missing project code or token.");
+                        JOptionPane.showMessageDialog(
+                                null,
+                                "Please provide both Project Code and Access Token.",
+                                "Input Required",
+                                JOptionPane.WARNING_MESSAGE
+                        );
+                    }
+                } catch (ExecutionException ee) {
+                    Throwable cause = ee.getCause();
+                    if (cause instanceof GitLabApiException) {
+                        GitLabApiException ex = (GitLabApiException) cause;
+                        String userFriendlyMsg;
+                        int status = ex.getHttpStatus();
+
+                        switch (status) {
+                            case 401:
+                                userFriendlyMsg = "Unauthorized: Please check your access token.";
+                                break;
+                            case 403:
+                                userFriendlyMsg = "Forbidden: Your token may not have sufficient permissions.";
+                                break;
+                            case 404:
+                                userFriendlyMsg = "Not Found: Invalid project ID or repository doesn't exist.";
+                                break;
+                            default:
+                                userFriendlyMsg = "Error connecting to GitLab: " + ex.getMessage();
+                        }
+
+                        log.severe("GitLab API error (" + status + "): " + ex.getMessage());
+                        showStatus(false, userFriendlyMsg);
+                        JOptionPane.showMessageDialog(null, userFriendlyMsg, "GitLab Error", JOptionPane.ERROR_MESSAGE);
+
+                    } else {
+                        log.severe("Unexpected error: " + cause.getMessage());
+                        showStatus(false, "Unexpected error: " + cause.getMessage());
+                        JOptionPane.showMessageDialog(null, cause.getMessage(), "Unexpected Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.severe("Operation was interrupted.");
+                    showStatus(false, "Operation was interrupted.");
+                } catch (Exception ex) {
+                    log.severe("General error: " + ex.getMessage());
+                    showStatus(false, "Unexpected error: " + ex.getMessage());
+                } finally {
+                    progressBar.setVisible(false);
+                }
+            }/*
             @Override
             protected void done() {
                 try {
@@ -311,13 +368,29 @@ public class GitLabUserDialog extends JDialog {
                         log.severe("Please provide both Project Code and Access Token to get User Info");
                         JOptionPane.showMessageDialog(null, "Please provide both Project Code and Access Token.");
                     }
-                } catch (Exception ex) {
+                }
+                catch (GitLabApiException ex) {
+                    String userFriendlyMsg;
+                    switch (ex.getHttpStatus()) {
+                        case 401:
+                            userFriendlyMsg = "Unauthorized: Please check your access token.";
+                            break;
+                        case 404:
+                            userFriendlyMsg = "Not Found: Invalid project ID or repository doesn't exist.";
+                            break;
+                        default:
+                            userFriendlyMsg = "Error connecting to GitLab: " + ex.getMessage();
+                    }
+                    log.severe("Unable to get User Information: " + ex.getMessage());
+                    showStatus(false, "Connection failed: " + ex.getMessage());
+                }
+                catch (Exception ex) {
                     log.severe("Unable to get User Information: " + ex.getMessage());
                     showStatus(false, "Connection failed: " + ex.getMessage());
                 } finally {
                     progressBar.setVisible(false); // Hide when done
                 }
-            }
+            }*/
         };
 
         worker.execute(); // Start background task
