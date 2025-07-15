@@ -107,7 +107,7 @@ public class GitLabUserDialog extends JDialog {
 
         JLabel lblProjectCode = new JLabel("Project Code:");
         lblProjectCode.setForeground(Color.WHITE);
-        projectCodeField = new JTextField(25);
+        projectCodeField = new JTextField(10);
         statusProjectCode = new JLabel(); // For tick/cross
         projectCodeField.setToolTipText(makeTooltip(
                 "/icons/gitlab.png",
@@ -121,7 +121,7 @@ public class GitLabUserDialog extends JDialog {
         ));
         JLabel lblToken = new JLabel("Access Token:");
         lblToken.setForeground(Color.WHITE);
-        tokenField = new JPasswordField(25);
+        tokenField = new JPasswordField(20);
         tokenField.setToolTipText(makeTooltip(
                 "/tooltips/token.png",
                 "GitLab Access Token",
@@ -141,7 +141,7 @@ public class GitLabUserDialog extends JDialog {
 
         JLabel lblUserName = new JLabel("User Name:");
         lblUserName.setForeground(Color.WHITE);
-        userNameField = new JTextField(25);
+        userNameField = new JTextField(20);
         userNameField.setEditable(false);
         userNameField.setToolTipText(makeTooltip(
                 "/tooltips/user-name.png",
@@ -152,7 +152,7 @@ public class GitLabUserDialog extends JDialog {
 
         JLabel lblRacf = new JLabel("User Id:");
         lblRacf.setForeground(Color.WHITE);
-        racfField = new JTextField(25);
+        racfField = new JTextField(20);
         racfField.setEditable(false);
         racfField.setToolTipText(makeTooltip(
                 "/tooltips/id-card.png",
