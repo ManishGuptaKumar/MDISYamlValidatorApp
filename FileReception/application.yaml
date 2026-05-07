@@ -1,0 +1,154 @@
+# ============================================================
+# File Reception Service - Metadata-Driven Configuration
+# ============================================================
+
+service:
+  name: "file-reception-service"
+  pollIntervalSeconds: 30
+  threadPoolSize: 8
+  workDir: "/tmp/file-reception/work"
+  archiveDir: "/tmp/file-reception/archive"
+  errorDir: "/tmp/file-reception/error"
+
+# ============================================================
+# Feed Definitions (one per logical data feed)
+# ============================================================
+feeds:
+
+  - feedId: "sales_daily"
+    description: "Daily sales extract from ERP"
+    enabled: true
+    sourceDir: "/data/inbound/sales"
+    doneFilePattern: "{filename}.done"          # e.g. sales_20240501.csv.done
+    filePattern: "sales_\\d{8}\\.csv"
+    encoding: "UTF-8"
+    delimiter: ","
+    headerLines: 1
+
+    validation:
+      checksum:
+        enabled: true
+        algorithm: "MD5"                        # MD5 | SHA-256 | SHA-512
+        source: "DONE_FILE"                     # DONE_FILE | SIDECAR | INLINE
+        sidecarExtension: ".md5"
+      rowCount:
+        enabled: true
+        source: "DONE_FILE"                     # DONE_FILE | SIDECAR | TRAILER
+        trailerColumnIndex: 0
+      filename:
+        enabled: true
+        pattern: "sales_\\d{8}\\.csv"
+        dateGroupIndex: 0
+        dateFormat: "yyyyMMdd"
+      fileSize:
+        enabled: true
+        minBytes: 1024
+        maxBytes: 5368709120                    # 5 GB
+
+    destinations:
+      - type: "S3"
+        enabled: true
+        bucket: "my-data-lake"
+        keyPrefix: "raw/sales/daily/"
+        keyPattern: "{feedId}/{yyyy}/{MM}/{dd}/{filename}"
+        storageClass: "STANDARD"
+        serverSideEncryption: "AES256"
+        multipartThresholdMb: 100
+
+      - type: "HDFS"
+        enabled: true
+        namenode: "hdfs://namenode:8020"
+        path: "/data/raw/sales/daily/{yyyy}/{MM}/{dd}/{filename}"
+        replicationFactor: 3
+        blockSizeMb: 128
+        overwrite: true
+
+    onSuccess:
+      archiveSource: true
+      deleteDoneFile: true
+      writeAuditLog: true
+
+    onFailure:
+      moveToErrorDir: true
+      alertEmail: "data-ops@company.com"
+      maxRetries: 3
+      retryDelaySeconds: 60
+
+  - feedId: "inventory_hourly"
+    description: "Hourly inventory snapshot"
+    enabled: true
+    sourceDir: "/data/inbound/inventory"
+    doneFilePattern: ".done"                    # single .done sentinel in dir
+    filePattern: "inventory_.*\\.csv\\.gz"
+    encoding: "UTF-8"
+    compressed: true
+    compressionType: "GZIP"
+
+    validation:
+      checksum:
+        enabled: true
+        algorithm: "SHA-256"
+        source: "SIDECAR"
+        sidecarExtension: ".sha256"
+      rowCount:
+        enabled: false
+      filename:
+        enabled: true
+        pattern: "inventory_\\d{8}_\\d{6}\\.csv\\.gz"
+      fileSize:
+        enabled: true
+        minBytes: 512
+        maxBytes: 1073741824                    # 1 GB
+
+    destinations:
+      - type: "S3"
+        enabled: true
+        bucket: "my-data-lake"
+        keyPrefix: "raw/inventory/"
+        keyPattern: "{feedId}/{yyyy}/{MM}/{dd}/{HH}/{filename}"
+        storageClass: "INTELLIGENT_TIERING"
+        serverSideEncryption: "aws:kms"
+        kmsKeyId: "arn:aws:kms:us-east-1:123456789:key/abc-def"
+        multipartThresholdMb: 50
+
+      - type: "HDFS"
+        enabled: false
+
+    onSuccess:
+      archiveSource: true
+      deleteDoneFile: true
+      writeAuditLog: true
+
+    onFailure:
+      moveToErrorDir: true
+      maxRetries: 2
+      retryDelaySeconds: 120
+
+# ============================================================
+# AWS Configuration
+# ============================================================
+aws:
+  region: "us-east-1"
+  credentialProvider: "DEFAULT"    # DEFAULT | PROFILE | INSTANCE_ROLE | ENV
+  profile: "default"
+  connectionTimeoutMs: 10000
+  socketTimeoutMs: 30000
+  maxConnections: 50
+
+# ============================================================
+# Hadoop / HDFS Configuration
+# ============================================================
+hadoop:
+  configDir: "/etc/hadoop/conf"
+  principal: ""                    # Kerberos principal (leave blank if not used)
+  keytab: ""                       # Path to keytab
+  bufferSizeBytes: 131072          # 128 KB
+
+# ============================================================
+# Audit / Observability
+# ============================================================
+audit:
+  logDir: "/var/log/file-reception"
+  logPattern: "audit_{feedId}_{date}.log"
+  metricsEnabled: true
+  metricsPort: 9090
